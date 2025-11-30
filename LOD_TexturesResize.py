@@ -4,11 +4,59 @@ from pathlib import Path
 from PIL import Image
 import threading
 
-EXCLUDED_TAGS = ['_NRM', '_NML', '_NORMAL', '_LOD2', '_LOD3']
+EXCLUDED_TAGS = ['_NRM', '_NML', '_NORMAL', '_LOD1', '_LOD2', '_LOD3', '_LOD4']
 LOD_SIZES = {
+    "_LOD1": (1024, 1024),
     "_LOD2": (256, 256),
-    "_LOD3": (64, 64)
+    "_LOD3": (64, 64),
+    "_LOD4": (16, 16)
 }
+
+DARK_COLORS = {
+    "bg": "#1e1e1e",
+    "panel_bg": "#252526",
+    "fg": "#dcdcdc",
+    "accent": "#00ff08",
+    "border": "#3c3c3c",
+    "input_bg": "#585861",
+    "button_bg": "#3a3d41",
+    "button_hover": "#9D9069"
+}
+
+def apply_dark_theme(root: tk.Tk):
+    """Define um tema escuro simples para a janela."""
+    colors = DARK_COLORS
+    root.configure(bg=colors["bg"])
+
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    style.configure("TFrame", background=colors["bg"])
+    style.configure("TLabel", background=colors["bg"], foreground=colors["fg"])
+    style.configure(
+        "TButton",
+        background=colors["button_bg"],
+        foreground=colors["fg"],
+        bordercolor=colors["border"],
+        focusthickness=3,
+        focuscolor=colors["accent"]
+    )
+    style.map("TButton", background=[("active", colors["button_hover"])])
+    style.configure(
+        "TEntry",
+        fieldbackground=colors["input_bg"],
+        foreground=colors["fg"],
+        insertcolor=colors["fg"],
+        background=colors["input_bg"]
+    )
+    style.map("TEntry", fieldbackground=[("readonly", colors["input_bg"])])
+    style.configure(
+        "Vertical.TScrollbar",
+        gripcount=0,
+        background=colors["bg"],
+        troughcolor=colors["input_bg"],
+        bordercolor=colors["border"],
+        arrowcolor=colors["fg"]
+    )
 
 
 def is_excluded(filename: str) -> bool:
@@ -27,7 +75,7 @@ def generate_lods(image_path: Path, status_callback):
                     resized.save(lod_filename)
                     status_callback(f"{lod_suffix[1:]} criado: {lod_filename.name}")
                 else:
-                    status_callback(f"{lod_suffix[1:]} ignorado (já existe): {lod_filename.name}")
+                    status_callback(f"{lod_suffix[1:]} ignorado (ja existe): {lod_filename.name}")
     except Exception as e:
         status_callback(f"Erro ao processar {image_path.name}: {e}")
 
@@ -43,12 +91,12 @@ def process_folder(folder_path: Path, status_callback, done_callback):
 
     for idx, file in enumerate(png_files, 1):
         if is_excluded(file.stem):
-            status_callback(f"[{idx}] Ignorado (excluído): {file.name}")
+            status_callback(f"[{idx}] Ignorado (excluido): {file.name}")
             continue
         status_callback(f"[{idx}] Processando: {file.name}")
         generate_lods(file, status_callback)
 
-    status_callback("\n#### Finalizado! Que a Força esteja com você :)")
+    status_callback("\n#### Finalizado! Que a Forca esteja com voce :)")
     done_callback()
 
 
@@ -57,6 +105,7 @@ class TextureApp:
         self.root = root
         self.root.title("LOD Textures Generator")
         self.folder_path = tk.StringVar()
+        apply_dark_theme(self.root)
 
         self.create_widgets()
 
@@ -73,7 +122,17 @@ class TextureApp:
 
         ttk.Button(frame, text="Limpar status", command=self.clear_status).grid(row=2, column=1, pady=10, sticky='e')
 
-        self.status = tk.Text(frame, height=15, state='disabled', wrap='word')
+        self.status = tk.Text(
+            frame,
+            height=15,
+            state='disabled',
+            wrap='word',
+            bg=DARK_COLORS["panel_bg"],
+            fg=DARK_COLORS["fg"],
+            insertbackground=DARK_COLORS["fg"],
+            highlightthickness=0,
+            relief=tk.FLAT
+        )
         self.status.grid(row=3, column=0, columnspan=2, sticky='nsew')
 
         frame.rowconfigure(3, weight=1)
@@ -92,7 +151,7 @@ class TextureApp:
     def start_processing(self):
         folder = Path(self.folder_path.get())
         if not folder.exists():
-            messagebox.showerror("Erro", "A pasta selecionada não existe.")
+            messagebox.showerror("Erro", "A pasta selecionada nao existe.")
             return
 
         self.process_btn.config(state='disabled')
