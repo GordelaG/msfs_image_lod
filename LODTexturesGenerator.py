@@ -4,9 +4,10 @@ from pathlib import Path
 from PIL import Image
 import threading
 
-EXCLUDED_TAGS = ['_LOD1', '_LOD2', '_LOD3', '_LOD4']
-LOD_ORDER = ["_LOD1", "_LOD2", "_LOD3", "_LOD4"]
-DEFAULT_LOD_PERCENTS = ["50", "25", "5", "1"]  # Percentual do tamanho original para cada LOD
+EXCLUDED_TAGS = ['_LOD1', '_LOD2', '_LOD3', '_LOD4', '_LOD5', '_LOD6']
+LOD_ORDER = ["_LOD1", "_LOD2", "_LOD3", "_LOD4", "_LOD5", "_LOD6"]
+ALLOWED_SIZES = [128, 256, 512, 1024, 2048, 4096]
+DEFAULT_LOD_SIZES = ["4096", "2048", "1024", "512", "256", "128", "64", ]
 
 DARK_COLORS = {
     "bg": "#0f1117",
@@ -100,22 +101,17 @@ def is_excluded(filename: str, include_normals: bool) -> bool:
     if not include_normals and "norm" in name_lower:
         return True
     return any(tag.lower() in name_lower for tag in EXCLUDED_TAGS)
-
-
-def generate_lods(image_path: Path, max_lods: int, scales, status_callback):
+def generate_lods(image_path: Path, sizes, status_callback):
     try:
         with Image.open(image_path) as img:
             img = img.convert("RGBA")  # Garante compatibilidade
-            original_w, original_h = img.size
 
-            for lod_suffix, percent in zip(LOD_ORDER[:max_lods], scales[:max_lods]):
-                scale = max(percent, 1) / 100.0
-                size = (max(1, int(original_w * scale)), max(1, int(original_h * scale)))
+            for lod_suffix, size in zip(LOD_ORDER, sizes):
                 lod_filename = image_path.with_name(image_path.stem + lod_suffix + image_path.suffix)
                 if not lod_filename.exists():
                     resized = img.resize(size, Image.LANCZOS)
                     resized.save(lod_filename)
-                    status_callback(f"{lod_suffix[1:]} criado: {lod_filename.name}")
+                    status_callback(f"{lod_suffix[1:]} criado: {lod_filename.name} ({size[0]}x{size[1]})")
                 else:
                     status_callback(f"{lod_suffix[1:]} ignorado (ja existe): {lod_filename.name}")
     except Exception as e:
@@ -147,15 +143,15 @@ def delete_lods_in_folder(folder_path: Path, status_callback, done_callback):
     done_callback()
 
 
-def process_folder(folder_path: Path, lod_count: int, scales, include_normals: bool, status_callback, done_callback):
+def process_folder(folder_path: Path, lod_sizes, include_normals: bool, status_callback, done_callback):
     png_files = list(folder_path.glob("*.png"))
     if not png_files:
         status_callback("Nenhum arquivo PNG encontrado.")
         done_callback()
         return
 
-    scale_desc = ", ".join(f"{s}%" for s in scales[:lod_count])
-    status_callback(f"Processando {len(png_files)} arquivos PNG (gerando {lod_count} LODs com escalas: {scale_desc})...")
+    size_desc = ", ".join(f"{s[0]}x{s[1]}" for s in lod_sizes)
+    status_callback(f"Processando {len(png_files)} arquivos PNG ({len(lod_sizes)} LODs: {size_desc})...")
     status_callback("Incluindo arquivos NORM." if include_normals else "Ignorando arquivos NORM.")
 
     for idx, file in enumerate(png_files, 1):
@@ -163,7 +159,7 @@ def process_folder(folder_path: Path, lod_count: int, scales, include_normals: b
             status_callback(f"[{idx}] Ignorado (excluido): {file.name}")
             continue
         status_callback(f"[{idx}] Processando: {file.name}")
-        generate_lods(file, lod_count, scales, status_callback)
+        generate_lods(file, lod_sizes, status_callback)
 
     status_callback("\n#### Finalizado! Que a Forca esteja com voce :)")
     done_callback()
@@ -174,9 +170,9 @@ class TextureApp:
         self.root = root
         self.root.title("LOD Textures Generator")
         self.folder_path = tk.StringVar()
-        self.lod_count = tk.StringVar(value=str(len(LOD_ORDER)))
-        self.lod_scale_vars = [
-            tk.StringVar(value=DEFAULT_LOD_PERCENTS[idx])
+        self.lod_count = tk.StringVar(value="4")
+        self.lod_size_vars = [
+            tk.StringVar(value=DEFAULT_LOD_SIZES[idx])
             for idx in range(len(LOD_ORDER))
         ]
         self.include_normals = tk.BooleanVar(value=True)
@@ -225,7 +221,7 @@ class TextureApp:
         ttk.Label(lod_card, text="Configuracao de LODs", style="Card.TLabel").grid(row=0, column=0, sticky='w')
         ttk.Label(
             lod_card,
-            text="Defina a quantidade e o percentual de reducao para cada LOD.",
+            text="Defina a quantidade de LODs e o tamanho de cada um (potencias de 2).",
             style="CardMuted.TLabel"
         ).grid(row=1, column=0, columnspan=3, sticky='w', pady=(2, 8))
 
@@ -238,13 +234,24 @@ class TextureApp:
             state="readonly"
         ).grid(row=2, column=1, sticky='w')
 
-        ttk.Label(lod_card, text="Escalas (%):", style="Card.TLabel").grid(row=3, column=0, sticky='nw', pady=(8, 0))
-        scales_frame = ttk.Frame(lod_card)
-        scales_frame.grid(row=3, column=1, sticky='w', pady=(8, 0))
+        ttk.Label(
+            lod_card,
+            text="Tamanhos (lado em px - escolha entre 256, 512, 1024, 2048, 4096 em ordem decrescente):",
+            style="Card.TLabel"
+        ).grid(row=3, column=0, sticky='nw', pady=(10, 0))
+        sizes_frame = ttk.Frame(lod_card)
+        sizes_frame.grid(row=3, column=1, sticky='w', pady=(10, 0))
         for idx, lod_name in enumerate(LOD_ORDER):
-
-            ttk.Label(scales_frame, text=f"{lod_name[1:]}:", style="Card.TLabel").grid(row=0, column=idx * 2, sticky='w', padx=(0, 2))
-            ttk.Entry(scales_frame, textvariable=self.lod_scale_vars[idx], width=6).grid(row=0, column=idx * 2 + 1, sticky='w', padx=(0, 8))
+            row = idx // 3
+            col = (idx % 3) * 2
+            ttk.Label(sizes_frame, text=f"{lod_name[1:]}:", style="Card.TLabel").grid(row=row, column=col, sticky='w', padx=(0, 4), pady=(0, 6))
+            ttk.Combobox(
+                sizes_frame,
+                textvariable=self.lod_size_vars[idx],
+                values=[str(v) for v in ALLOWED_SIZES],
+                width=8,
+                state="readonly"
+            ).grid(row=row, column=col + 1, sticky='w', padx=(0, 12), pady=(0, 6))
 
         actions = ttk.Frame(container, padding=(0, 4))
         actions.grid(row=3, column=0, sticky='ew', pady=(0, 10))
@@ -284,17 +291,23 @@ class TextureApp:
         self.status.delete("1.0", tk.END)
         self.status.config(state='disabled')
 
-    def collect_scales(self, lod_count: int):
-        scales = []
+    def collect_lod_sizes(self, lod_count: int):
+        sizes = []
+        allowed_set = set(ALLOWED_SIZES)
         for idx in range(lod_count):
             try:
-                value = int(self.lod_scale_vars[idx].get())
+                value = int(self.lod_size_vars[idx].get())
             except ValueError:
-                value = 0
-            if value < 1 or value > 100:
-                raise ValueError(f"Valor invalido para {LOD_ORDER[idx][1:]}: use entre 1 e 100.")
-            scales.append(value)
-        return scales
+                raise ValueError(f"Valor invalido para {LOD_ORDER[idx][1:]}: escolha um dos valores permitidos.")
+            if value not in allowed_set:
+                raise ValueError(f"{LOD_ORDER[idx][1:]} deve ser um destes valores: {ALLOWED_SIZES}.")
+            sizes.append((value, value))
+
+        for idx in range(1, len(sizes)):
+            if sizes[idx][0] > sizes[idx - 1][0] or sizes[idx][1] > sizes[idx - 1][1]:
+                raise ValueError("Defina os LODs em ordem decrescente (ex.: 4096 >= 2048 >= 1024 ...).")
+
+        return sizes
 
     def start_processing(self):
         folder = Path(self.folder_path.get())
@@ -311,7 +324,7 @@ class TextureApp:
             return
 
         try:
-            scales = self.collect_scales(lod_count)
+            lod_sizes = self.collect_lod_sizes(lod_count)
         except ValueError as exc:
             messagebox.showerror("Erro", str(exc))
             return
@@ -323,7 +336,7 @@ class TextureApp:
         # Iniciar thread de forma segura
         thread = threading.Thread(
             target=process_folder,
-            args=(folder, lod_count, scales, self.include_normals.get(), self.status_output, self.reenable_actions),
+            args=(folder, lod_sizes, self.include_normals.get(), self.status_output, self.reenable_actions),
             daemon=True
         )
         thread.start()
@@ -359,6 +372,6 @@ class TextureApp:
 if __name__ == '__main__':
     root = tk.Tk()
     app = TextureApp(root)
-    root.geometry("820x620")
-    root.minsize(760, 560)
+    root.geometry("1000x720")
+    root.minsize(880, 640)
     root.mainloop()
