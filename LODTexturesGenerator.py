@@ -4,10 +4,10 @@ from pathlib import Path
 from PIL import Image
 import threading
 
-EXCLUDED_TAGS = ['_LOD1', '_LOD2', '_LOD3', '_LOD4', '_LOD5', '_LOD6']
-LOD_ORDER = ["_LOD1", "_LOD2", "_LOD3", "_LOD4", "_LOD5", "_LOD6"]
-ALLOWED_SIZES = [128, 256, 512, 1024, 2048, 4096]
-DEFAULT_LOD_SIZES = ["4096", "2048", "1024", "512", "256", "128", "64", ]
+EXCLUDED_TAGS = ['_LOD1', '_LOD2', '_LOD3', '_LOD4', '_LOD5', '_LOD6', '_LOD7', '_LOD8', '_LOD9']
+LOD_ORDER = ["_LOD1", "_LOD2", "_LOD3", "_LOD4", "_LOD5", "_LOD6", "_LOD7", "_LOD8", "_LOD9"]
+ALLOWED_SIZES = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+DEFAULT_LOD_SIZES = ["4096", "2048", "1024", "512", "256", "128", "64", "32", "16"]
 
 DARK_COLORS = {
     "bg": "#0f1117",
@@ -221,26 +221,26 @@ class TextureApp:
         ttk.Label(lod_card, text="Configuracao de LODs", style="Card.TLabel").grid(row=0, column=0, sticky='w')
         ttk.Label(
             lod_card,
-            text="Defina a quantidade de LODs e o tamanho de cada um (potencias de 2).",
+            text="Defina a quantidade de LODs e o tamanho de cada textura.",
             style="CardMuted.TLabel"
         ).grid(row=1, column=0, columnspan=3, sticky='w', pady=(2, 8))
 
-        ttk.Label(lod_card, text="Quantidade:", style="Card.TLabel").grid(row=2, column=0, sticky='w')
+        ttk.Label(lod_card, text="Quantidade de LODs:", style="Card.TLabel").grid(row=2, column=0, sticky='w')
         ttk.Combobox(
             lod_card,
             textvariable=self.lod_count,
             values=[str(i) for i in range(1, len(LOD_ORDER) + 1)],
-            width=6,
+            width=15,
             state="readonly"
-        ).grid(row=2, column=1, sticky='w')
+        ).grid(row=2, column=0, sticky='s', pady=(2, 2))
 
         ttk.Label(
             lod_card,
-            text="Tamanhos (lado em px - escolha entre 256, 512, 1024, 2048, 4096 em ordem decrescente):",
+            text="Selecione o tamanho de redução de cada LOD em ordem decrescente.",
             style="Card.TLabel"
         ).grid(row=3, column=0, sticky='nw', pady=(10, 0))
         sizes_frame = ttk.Frame(lod_card)
-        sizes_frame.grid(row=3, column=1, sticky='w', pady=(10, 0))
+        sizes_frame.grid(row=4, column=0, sticky='w', pady=(10, 0))
         for idx, lod_name in enumerate(LOD_ORDER):
             row = idx // 3
             col = (idx % 3) * 2
@@ -249,7 +249,7 @@ class TextureApp:
                 sizes_frame,
                 textvariable=self.lod_size_vars[idx],
                 values=[str(v) for v in ALLOWED_SIZES],
-                width=8,
+                width=15,
                 state="readonly"
             ).grid(row=row, column=col + 1, sticky='w', padx=(0, 12), pady=(0, 6))
 
